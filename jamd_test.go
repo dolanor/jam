@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 )
 
@@ -20,7 +21,12 @@ func TestJamdServeHTTP(t *testing.T) {
 	})
 	backend := httptest.NewServer(mux)
 	defer backend.Close()
-	cfg.host2backend[backend.URL] = backend.URL
+
+	backendURL, err := url.Parse(backend.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.host2backend[backendURL.Host] = backend.URL
 
 	j := NewJamd(cfg)
 	proxy := httptest.NewServer(j)
@@ -32,7 +38,7 @@ func TestJamdServeHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Host = backend.URL
+	req.Host = backendURL.Host
 
 	slog.Info("TEST", "cfg", cfg.host2backend, "proxyURL", proxy.URL, "beURL", backend.URL)
 
