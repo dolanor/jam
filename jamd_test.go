@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,24 +18,31 @@ func TestJamdServeHTTP(t *testing.T) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(want))
 	})
-	be := httptest.NewServer(mux)
-	cfg.host2backend["app.example.com"] = be.URL
+	backend := httptest.NewServer(mux)
+	defer backend.Close()
+	cfg.host2backend[backend.URL] = backend.URL
 
 	j := NewJamd(cfg)
 	proxy := httptest.NewServer(j)
+	defer proxy.Close()
 
 	c := proxy.Client()
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/%s", proxy.URL, "dolanor"), nil)
+	//req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/%s", proxy.URL, "dolanor"), nil)
+	req, err := http.NewRequest(http.MethodGet, proxy.URL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Host", "app.example.com")
+	req.Host = backend.URL
+
+	slog.Info("TEST", "cfg", cfg.host2backend, "proxyURL", proxy.URL, "beURL", backend.URL)
 
 	resp, err := c.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
+
+	t.Log("resp status:", resp.StatusCode)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
