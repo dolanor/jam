@@ -1,0 +1,31 @@
+services:
+  dind:
+    image: docker:dind
+    privileged: true
+    volumes:
+      - dind-socket-dir:/var/run
+
+  claude:
+    image: dolanor/claude-cu:latest
+    build:
+      context: .
+      args:
+        # use > docker compose build --build-arg USER_ID=`id -u`
+        # to inject your current user id to access the container user
+        # home fs with the correct permissions
+        USER_ID:
+    command: [ "sleep", "168h" ]
+    volumes:
+      - dind-socket-dir:/var/run
+
+      - .:/home/coder/src
+      # we blacklist .env to avoid credentials lying around in the container
+      - /dev/null:/home/coder/src/.env
+
+      - $HOME/.vim:/home/coder/.vim
+      - $HOME/.vimrc:/home/coder/.vimrc:ro
+      - $HOME/.gitconfig:/home/coder/.gitconfig:ro
+      - $HOME/.docker:/home/coder/.docker:ro
+
+volumes:
+  dind-socket-dir:
