@@ -18,8 +18,6 @@ func NewJamd(config config) *jamd {
 }
 
 func (j *jamd) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	slog.Info("req uri", "uri", r.RequestURI)
-
 	host := r.Host
 	backend, ok := j.config.host2backend[host]
 	if !ok {
@@ -34,8 +32,6 @@ func (j *jamd) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	slog.Info("cfg", "map", j.config.host2backend, "host", host, "backend", backend)
 
 	// A server *http.Request can't be reused as a client request: RequestURI
 	// must be empty and URL must be absolute (scheme+host), so build a fresh

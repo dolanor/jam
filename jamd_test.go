@@ -2,7 +2,6 @@ package main
 
 import (
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -33,22 +32,18 @@ func TestJamdServeHTTP(t *testing.T) {
 	defer proxy.Close()
 
 	c := proxy.Client()
-	//req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/%s", proxy.URL, "dolanor"), nil)
 	req, err := http.NewRequest(http.MethodGet, proxy.URL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.Host = backendURL.Host
 
-	slog.Info("TEST", "cfg", cfg.host2backend, "proxyURL", proxy.URL, "beURL", backend.URL)
 
 	resp, err := c.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-
-	t.Log("resp status:", resp.StatusCode)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
