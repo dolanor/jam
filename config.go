@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffenv"
@@ -27,6 +28,9 @@ type config struct {
 	keyFile  string
 
 	host2backend map[string]string
+
+	cacheEnabled bool
+	cacheTTL     time.Duration
 }
 
 func loadConfig(args []string) (config, error) {
@@ -42,6 +46,8 @@ func loadConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.certFile, 0, "cert-file", "", "cert file path for the TLS configuration")
 	fs.StringVar(&cfg.keyFile, 0, "key-file", "", "key file path for the TLS configuration")
 	fs.StringListVar(&host2backend, 0, "host2backend", "mapping between host to its backend (format: <hostname>:<backend_scheme>://<backend_hostname>[:<backend_port>]. eg. github.com:http://1.2.3.4:8080)")
+	fs.BoolVarDefault(&cfg.cacheEnabled, 0, "cache-enabled", false, "cache proxied GET/HEAD responses in memory")
+	fs.DurationVar(&cfg.cacheTTL, 0, "cache-ttl", time.Minute, "how long a cached response stays fresh")
 
 	err := ff.Parse(fs, args,
 		ff.WithEnvVarPrefix("JAMD"),

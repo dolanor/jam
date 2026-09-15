@@ -9,12 +9,19 @@ import (
 
 type jamd struct {
 	config config
+	cache  *cache
 }
 
 func NewJamd(config config) *jamd {
-	return &jamd{
+	j := &jamd{
 		config: config,
 	}
+
+	if config.cacheEnabled {
+		j.cache = newCache(config.cacheTTL)
+	}
+
+	return j
 }
 
 func (j *jamd) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -24,6 +31,17 @@ func (j *jamd) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		slog.Error("proxying: no backend configured for host", "host", host)
 		http.Error(w, "no backend configured for host", http.StatusBadGateway)
 		return
+	}
+
+	var key cacheKey
+	if j.cache != nil {
+		key = newCacheKey(r)
+		if entry, hit := j.cache.get(key); hit {
+			if err := writeEntry(w, entry); err != nil {
+				slog.Error("proxying: writing cached response", "error", err)
+			}
+			return
+		}
 	}
 
 	backendURL, err := url.Parse(backend)
@@ -55,10 +73,28 @@ func (j *jamd) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add(k, v)
 		}
 	}
-	w.WriteHeader(resp.StatusCode)
 
-	n, err := io.Copy(w, resp.Body)
-	if err != nil {
-		slog.Error("proxying: copying", "error", err, "bytes", n)
+	switch store := j.cache != nil && cacheable(r.Method, resp.StatusCode); store {
+	case true:
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			slog.Error("proxying: reading response body", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		j.cache.set(key, resp.StatusCode, w.Header(), body)
+
+		w.WriteHeader(resp.StatusCode)
+		if _, err := w.Write(body); err != nil {
+			slog.Error("proxying: writing response", "error", err)
+		}
+	default:
+		w.WriteHeader(resp.StatusCode)
+
+		n, err := io.Copy(w, resp.Body)
+		if err != nil {
+			slog.Error("proxying: copying", "error", err, "bytes", n)
+		}
 	}
 }
