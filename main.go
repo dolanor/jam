@@ -36,7 +36,7 @@ func run(args []string) error {
 	}
 
 	hostPort := fmt.Sprintf("%s:%d", cfg.host, cfg.port)
-	slog.Info("listen and serve", "scheme", cfg.scheme, "host", cfg.host, "port", cfg.port)
+	slog.Info("listen and serve", "scheme", cfg.scheme, "host", cfg.host, "port", cfg.port, "host2backend", cfg.host2backend)
 
 	j := NewJamd(cfg)
 

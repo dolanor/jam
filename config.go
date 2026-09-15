@@ -41,7 +41,7 @@ func loadConfig(args []string) (config, error) {
 	fs.IntVar(&cfg.port, 'P', "port", 44444, "port to listen on")
 	fs.StringVar(&cfg.certFile, 0, "cert-file", "", "cert file path for the TLS configuration")
 	fs.StringVar(&cfg.keyFile, 0, "key-file", "", "key file path for the TLS configuration")
-	fs.StringListVar(&host2backend, 0, "host2backend", "mapping between host to its backend")
+	fs.StringListVar(&host2backend, 0, "host2backend", "mapping between host to its backend (format: <hostname>:<backend_scheme>://<backend_hostname>[:<backend_port>]. eg. github.com:http://1.2.3.4:8080)")
 
 	err := ff.Parse(fs, args,
 		ff.WithEnvVarPrefix("JAMD"),
