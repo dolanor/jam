@@ -1,6 +1,6 @@
 # Jamd
 
-Jamd is a simple reverse proxy with some caching features.
+Jamd is a simple reverse proxy with some in-memory caching features.
 
 ## Use
 
