@@ -39,3 +39,21 @@ JAMD_HOST2BACKEND=github.com:http://1.2.3.4:8080
 JAMD_CACHE_ENABLED=true
 JAMD_CACHE_TTL=1m
 ```
+
+
+## As a package
+
+You can use the module in your project with a:
+
+```go
+import(
+	"github.com/dolanor/jam"
+	"github.com/dolanor/jam/config"
+)
+	
+func main() {
+	cfg, _ := config.Load(args)
+	j := jam.NewJamd(cfg)
+	http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.Host, cfg.Port, j)
+}
+```
