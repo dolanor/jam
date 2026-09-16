@@ -1,5 +1,9 @@
 # Jamd
 
+> Some way to be in Traefik
+
+![The radar, Sir. It appears to be jammed](https://i.makeagif.com/media/2-12-2026/mv5hB_.gif)
+
 Jamd is a simple reverse proxy with some in-memory caching features.
 
 ## Use
