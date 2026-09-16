@@ -57,105 +57,79 @@ func TestJamdServeHTTP(t *testing.T) {
 	}
 }
 
-func TestJamdServeHTTPCacheHitSkipsBackend(t *testing.T) {
-	cfg := config{
-		host2backend: map[string]string{},
-		cacheEnabled: true,
-		cacheTTL:     time.Minute,
+func TestJamdServeHTTPCacheHit(t *testing.T) {
+	cases := map[string]struct {
+		config   config
+		wantHits int32
+	}{
+		"with cache": {
+			config: config{
+				host2backend: map[string]string{},
+				cacheEnabled: true,
+				cacheTTL:     time.Minute,
+			},
+			wantHits: 1,
+		},
+		"without cache": {
+			config: config{
+				host2backend: map[string]string{},
+			},
+			wantHits: 2,
+		},
 	}
 
-	want := "Hello backend"
-	var hits atomic.Int32
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
-		w.Write([]byte(want))
-	})
-	backend := httptest.NewServer(mux)
-	defer backend.Close()
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg := c.config
 
-	backendURL, err := url.Parse(backend.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg.host2backend[backendURL.Host] = backend.URL
+			want := "Hello backend"
+			var hits atomic.Int32
+			mux := http.NewServeMux()
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				hits.Add(1)
+				w.Write([]byte(want))
+			})
+			backend := httptest.NewServer(mux)
+			defer backend.Close()
 
-	j := NewJamd(cfg)
-	proxy := httptest.NewServer(j)
-	defer proxy.Close()
+			backendURL, err := url.Parse(backend.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg.host2backend[backendURL.Host] = backend.URL
 
-	c := proxy.Client()
+			j := NewJamd(cfg)
+			proxy := httptest.NewServer(j)
+			defer proxy.Close()
 
-	for i := range 2 {
-		req, err := http.NewRequest(http.MethodGet, proxy.URL, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		req.Host = backendURL.Host
+			cl := proxy.Client()
 
-		resp, err := c.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
+			for i := range 2 {
+				req, err := http.NewRequest(http.MethodGet, proxy.URL, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				req.Host = backendURL.Host
 
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
+				resp, err := cl.Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-		if got := string(body); got != want {
-			t.Fatalf("request %d:\n\tgot : %v\n\twant: %v", i, got, want)
-		}
-	}
+				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
 
-	if got := hits.Load(); got != 1 {
-		t.Fatalf("backend hits = %d, want 1 (second request should have been served from cache)", got)
-	}
-}
+				if got := string(body); got != want {
+					t.Fatalf("request %d:\n\tgot : %v\n\twant: %v", i, got, want)
+				}
+			}
 
-func TestJamdServeHTTPCacheDisabledHitsBackendEveryTime(t *testing.T) {
-	cfg := config{
-		host2backend: map[string]string{},
-	}
-
-	var hits atomic.Int32
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
-		w.Write([]byte("Hello backend"))
-	})
-	backend := httptest.NewServer(mux)
-	defer backend.Close()
-
-	backendURL, err := url.Parse(backend.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg.host2backend[backendURL.Host] = backend.URL
-
-	j := NewJamd(cfg)
-	proxy := httptest.NewServer(j)
-	defer proxy.Close()
-
-	c := proxy.Client()
-
-	for range 2 {
-		req, err := http.NewRequest(http.MethodGet, proxy.URL, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		req.Host = backendURL.Host
-
-		resp, err := c.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		io.ReadAll(resp.Body)
-		resp.Body.Close()
-	}
-
-	if got := hits.Load(); got != 2 {
-		t.Fatalf("backend hits = %d, want 2 (caching disabled, backend should be hit every time)", got)
+			if got := hits.Load(); got != c.wantHits {
+				t.Fatalf("backend hits = %d, want 1 (second request should have been served from cache)", got)
+			}
+		})
 	}
 }
