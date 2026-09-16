@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/dolanor/jam"
+	"github.com/dolanor/jam/config"
 )
 
 const (
@@ -20,7 +23,7 @@ func main() {
 		slog.Error("run", "error", err)
 
 		switch {
-		case errors.Is(err, ErrConfig):
+		case errors.Is(err, config.Err):
 			os.Exit(ExitCodeErrConfig)
 		default:
 			os.Exit(ExitCodeErrRun)
@@ -29,24 +32,24 @@ func main() {
 }
 
 func run(args []string) error {
-	cfg, err := loadConfig(args)
+	cfg, err := config.Load(args)
 	if err != nil {
 		slog.Error("load configuration", "error", err)
 		os.Exit(ExitCodeErrConfig)
 	}
 
-	hostPort := fmt.Sprintf("%s:%d", cfg.host, cfg.port)
-	slog.Info("listen and serve", "scheme", cfg.scheme, "host", cfg.host, "port", cfg.port, "host2backend", cfg.host2backend)
+	hostPort := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	slog.Info("listen and serve", "scheme", cfg.Scheme, "host", cfg.Host, "port", cfg.Port, "host2backend", cfg.Host2Backend)
 
-	j := NewJamd(cfg)
+	j := jam.NewJamd(cfg)
 
-	switch strings.ToLower(cfg.scheme) {
+	switch strings.ToLower(cfg.Scheme) {
 	case "http":
 		err = http.ListenAndServe(hostPort, j)
 	case "https":
-		err = http.ListenAndServeTLS(hostPort, cfg.certFile, cfg.keyFile, j)
+		err = http.ListenAndServeTLS(hostPort, cfg.CertFile, cfg.KeyFile, j)
 	default:
-		return fmt.Errorf("%w: %q", ErrConfigWrongScheme, cfg.scheme)
+		return fmt.Errorf("%w: %q", config.ErrWrongScheme, cfg.Scheme)
 	}
 	if err != nil {
 		return fmt.Errorf("listen and serve: %w", err)

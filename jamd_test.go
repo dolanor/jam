@@ -1,4 +1,4 @@
-package main
+package jam
 
 import (
 	"io"
@@ -8,11 +8,14 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/dolanor/jam/internal/cache"
+	"github.com/dolanor/jam/internal/config"
 )
 
 func TestJamdServeHTTP(t *testing.T) {
-	cfg := config{
-		host2backend: map[string]string{},
+	cfg := config.Config{
+		Host2Backend: map[string]string{},
 	}
 
 	want := "Hello backend"
@@ -27,7 +30,7 @@ func TestJamdServeHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.host2backend[backendURL.Host] = backend.URL
+	cfg.Host2Backend[backendURL.Host] = backend.URL
 
 	j := NewJamd(cfg)
 	proxy := httptest.NewServer(j)
@@ -59,20 +62,20 @@ func TestJamdServeHTTP(t *testing.T) {
 
 func TestJamdServeHTTPCacheHit(t *testing.T) {
 	cases := map[string]struct {
-		config   config
+		config   config.Config
 		wantHits int32
 	}{
 		"with cache": {
-			config: config{
-				host2backend: map[string]string{},
-				cacheEnabled: true,
-				cacheTTL:     time.Minute,
+			config: config.Config{
+				Host2Backend: map[string]string{},
+				CacheEnabled: true,
+				CacheTTL:     time.Minute,
 			},
 			wantHits: 1,
 		},
 		"without cache": {
-			config: config{
-				host2backend: map[string]string{},
+			config: config.Config{
+				Host2Backend: map[string]string{},
 			},
 			wantHits: 2,
 		},
@@ -96,7 +99,7 @@ func TestJamdServeHTTPCacheHit(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			cfg.host2backend[backendURL.Host] = backend.URL
+			cfg.Host2Backend[backendURL.Host] = backend.URL
 
 			j := NewJamd(cfg)
 			proxy := httptest.NewServer(j)
@@ -131,5 +134,28 @@ func TestJamdServeHTTPCacheHit(t *testing.T) {
 				t.Fatalf("backend hits = %d, want 1 (second request should have been served from cache)", got)
 			}
 		})
+	}
+}
+
+func TestWriteEntry(t *testing.T) {
+	entry := cache.CacheEntry{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"X-Cache": []string{"HIT"}},
+		Body:       []byte("cached body"),
+	}
+
+	rec := httptest.NewRecorder()
+	if err := writeEntry(rec, entry); err != nil {
+		t.Fatalf("writeEntry() error = %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if got := rec.Header().Get("X-Cache"); got != "HIT" {
+		t.Errorf("header X-Cache = %q, want %q", got, "HIT")
+	}
+	if got := rec.Body.String(); got != "cached body" {
+		t.Errorf("body = %q, want %q", got, "cached body")
 	}
 }

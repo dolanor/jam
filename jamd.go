@@ -1,24 +1,27 @@
-package main
+package jam
 
 import (
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+
+	"github.com/dolanor/jam/cache"
+	"github.com/dolanor/jam/config"
 )
 
 type jamd struct {
-	config config
-	cache  *cache
+	config config.Config
+	cache  *cache.Cache
 }
 
-func NewJamd(config config) *jamd {
+func NewJamd(config config.Config) *jamd {
 	j := &jamd{
 		config: config,
 	}
 
-	if config.cacheEnabled {
-		j.cache = newCache(config.cacheTTL)
+	if config.CacheEnabled {
+		j.cache = cache.New(config.CacheTTL)
 	}
 
 	return j
@@ -26,17 +29,17 @@ func NewJamd(config config) *jamd {
 
 func (j *jamd) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	host := r.Host
-	backend, ok := j.config.host2backend[host]
+	backend, ok := j.config.Host2Backend[host]
 	if !ok {
 		slog.Error("proxying: no backend configured for host", "host", host)
 		http.Error(w, "no backend configured for host", http.StatusBadGateway)
 		return
 	}
 
-	key := newCacheKey(r)
+	key := cache.NewKey(r)
 	if j.cache != nil {
 		// cache hit
-		if entry, hit := j.cache.get(key); hit {
+		if entry, hit := j.cache.Get(key); hit {
 			if err := writeEntry(w, entry); err != nil {
 				slog.Error("proxying: writing cached response", "error", err)
 			}
@@ -89,9 +92,22 @@ func (j *jamd) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (j *jamd) saveToCache(key cacheKey, method string, statusCode int, header http.Header, body []byte) {
-	store := j.cache != nil && cacheable(method, statusCode)
+func (j *jamd) saveToCache(key cache.Key, method string, statusCode int, header http.Header, body []byte) {
+	store := j.cache != nil && cache.Cacheable(method, statusCode)
 	if store {
-		j.cache.set(key, statusCode, header, body)
+		j.cache.Set(key, statusCode, header, body)
 	}
+}
+
+// writeEntry replays a cached entry onto w as if it had just come from the
+// backend.
+func writeEntry(w http.ResponseWriter, entry cache.CacheEntry) error {
+	dst := w.Header()
+	for k, vv := range entry.Header {
+		dst[k] = vv
+	}
+
+	w.WriteHeader(entry.StatusCode)
+	_, err := w.Write(entry.Body)
+	return err
 }
