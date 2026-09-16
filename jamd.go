@@ -81,13 +81,17 @@ func (j *jamd) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store := j.cache != nil && cacheable(r.Method, resp.StatusCode)
-	if store {
-		j.cache.set(key, resp.StatusCode, w.Header(), body)
-	}
+	j.saveToCache(key, r.Method, resp.StatusCode, w.Header(), body)
 
 	w.WriteHeader(resp.StatusCode)
 	if _, err := w.Write(body); err != nil {
 		slog.Error("proxying: writing response", "error", err)
+	}
+}
+
+func (j *jamd) saveToCache(key cacheKey, method string, statusCode int, header http.Header, body []byte) {
+	store := j.cache != nil && cacheable(method, statusCode)
+	if store {
+		j.cache.set(key, statusCode, header, body)
 	}
 }
