@@ -5,7 +5,7 @@ Jamd is a simple reverse proxy with some in-memory caching features.
 ## Use
 
 ```console
-go run github.com/dolanor/jamd@latest --host2backend github.com:http://1.2.3.4:8080
+go run github.com/dolanor/jam/cmd/jamd@latest --host2backend github.com:http://1.2.3.4:8080
 ```
 
 ### Configuration
